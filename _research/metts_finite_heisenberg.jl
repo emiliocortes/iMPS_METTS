@@ -7,11 +7,9 @@ L = 20 # number of sites
 
 chain = FiniteChain(L)
 J = 1.0
-g = 0.5
-# g = 0.0
 
-H = transverse_field_ising(chain; J, g)
-# H = heisenberg_XXX(chain; J, spin=1//2)
+# H = heisenberg_XXX(chain; J, spin=1)
+H = heisenberg_XXX(chain; J, spin=1//2)
 
 
 
@@ -59,11 +57,11 @@ envs = environments(mps, H)
 @show norm(mps)
 trotter_order = 2
 
-gate = tfim_gate(physical_space, dt, J, g; imaginary_time=true)
+gate = heisenberg_gate(physical_space, dt; imaginary_time=true)
 if trotter_order == 1
     mps = tebd!(mps, physical_space, dt, n_steps_timeevol, gate; imaginary_time=true, trotter_order=1, truncerr=atol, truncdim=max_dim)
 elseif trotter_order == 2
-    gate_half = tfim_gate(physical_space, dt/2, J, g; imaginary_time=true)
+    gate_half = heisenberg_gate(physical_space, dt/2; imaginary_time=true)
     mps = tebd!(mps, physical_space, dt, n_steps_timeevol, gate, gate_half; imaginary_time=true, trotter_order=2, truncerr=atol, truncdim=max_dim)
 end
 
@@ -119,11 +117,11 @@ function run_METTS(mps, H, projectors_1, projectors_2, beta, N_samples)
         # mps, envs = time_evolve(mps, H, t_span, TDVP(), envs; imaginary_evolution=true, verbosity=1)
 
 
-        gate = tfim_gate(physical_space, dt, J, g; imaginary_time=true)
+        gate = heisenberg_gate(physical_space, dt; imaginary_time=true)
         if trotter_order == 1
             mps = tebd!(mps, physical_space, dt, n_steps_timeevol, gate; imaginary_time=true, trotter_order=1, truncerr=atol, truncdim=max_dim)
         elseif trotter_order == 2
-            gate_half = tfim_gate(physical_space, dt/2, J, g; imaginary_time=true)
+            gate_half = heisenberg_gate(physical_space, dt/2; imaginary_time=true)
             mps = tebd!(mps, physical_space, dt, n_steps_timeevol, gate, gate_half; imaginary_time=true, trotter_order=2, truncerr=atol, truncdim=max_dim)
         end
 
