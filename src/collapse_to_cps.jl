@@ -12,15 +12,40 @@ P_up[1, 1] = 1.0
 P_dn = TensorMap(zeros, ComplexF64, V ← V)
 P_dn[2, 2] = 1.0
 
-# Create a projector onto |↑⟩ (first basis state)
+# Create a projector onto |+x⟩ (first basis state)
 P_pl = TensorMap(zeros, ComplexF64, V ← V)
-P_pl[1, 2] = 1.0
-P_pl[2, 1] = 1.0
+# P_pl[1, 2] = 1.0
+# P_pl[2, 1] = 1.0
+P_pl[1,1] = P_pl[2,2] = 0.5
+P_pl[1,2] = P_pl[2,1] = 0.5
 
-# Create a projector onto |↓⟩ (second basis state)
+# Create a projector onto |-x⟩ (second basis state)
 P_mn = TensorMap(zeros, ComplexF64, V ← V)
-P_mn[1, 2] = 1.0im
-P_mn[2, 1] = -1.0im
+# P_mn[1, 2] = 1.0im
+# P_mn[2, 1] = -1.0im
+P_mn[1,1] = P_mn[2,2] = 0.5
+P_mn[1,2] = P_mn[2,1] = -0.5
+#
+
+# Sz = 1/2 * [1 0; 0 -1]
+# Sp = [0 1; 0 0]
+# Sm = [0 0; 1 0]
+# Sx = 1/2 * [0 1; 1 0]
+# Sy = 1/2 * [0 -1im; 1im 0]
+# Id = [1 0; 0 1]
+
+# P_plus_site = Id/2 + Sz
+# P_minus_site = Id/2 - Sz
+
+
+
+# P_pl[:,:] = Id/2 + Sx
+# P_mn[:,:] = Id/2 - Sx
+
+# P_up[:,:] = Id/2 + Sz
+# P_dn[:,:] = Id/2 - Sz
+
+
 
 function apply_projector(AC::TensorMap, P::TensorMap)
     # AC has structure (χL ⊗ V_in) ← χR
@@ -53,7 +78,7 @@ function project_site!(mps::FiniteMPS, P::TensorMap, site::Int)
     # not necessary? (done automatically)
     AC = mps.AC[site]
     AC_proj = apply_projector(AC, P)
-    # AC_proj = AC_proj/norm(AC_proj) # normalize to mantain mps normalized
+    AC_proj = AC_proj/norm(AC_proj) # normalize to mantain mps normalized
     mps.AC[site] = AC_proj
     return mps
 end
@@ -68,12 +93,13 @@ function collapse_to_cps!(mps::FiniteMPS, projectors::Vector{<:TensorMap})
     L = length(mps)
     for i in 1:L
         r = rand()
-        P1 = projectors[1]
-        prob = projection_probability(mps, P, i)
+        P1, P2 = projectors
+
+        prob = projection_probability(mps, P1, i)
         if r <= prob
-            project_site!(mps, P, i)
+            project_site!(mps, P1, i)
         else
-            project_site!(mps, projectors[2], i)
+            project_site!(mps, P2, i)
         end
     end
     return mps
