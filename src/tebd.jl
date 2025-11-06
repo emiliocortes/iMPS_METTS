@@ -1,4 +1,4 @@
-using Base: nothing_sentinel
+# using Base: nothing_sentinel
 using MPSKit
 using TensorKit
 using LinearAlgebra
@@ -92,13 +92,17 @@ end
 """
 Apply a two-site gate to an MPS at bond (site, site+1) and truncate
 """
-function apply_two_site_gate!(ψ::FiniteMPS, gate::TensorMap, site::Int; trunc_params...)
+function apply_two_site_gate!(ψ::FiniteMPS, gate::TensorMap, site::Int; kwargs...)
     # # Move orthogonality center to the bond
     # ψ = MPSKit.center_position(ψ, site)
 
-    atol = get(trunc_params, :truncerr, 1e-8)
-    maxdim = get(trunc_params, :truncdim, 10)
-    combined_trunc = truncrank(maxdim) & trunctol(; atol)
+    if haskey(kwargs, :trscheme)
+        trscheme = kwargs[:trscheme]
+    else
+        atol = get(kwargs, :truncerr, 1e-8)
+        maxdim = get(kwargs, :truncdim, 10)
+        trscheme = truncrank(maxdim) & trunctol(; atol)
+    end
     
     # Get the two-site tensor
     @tensor θ[a, b, c, d] := ψ.AC[site][a, b, e] * ψ.AR[site+1][e, c, d]
@@ -108,7 +112,7 @@ function apply_two_site_gate!(ψ::FiniteMPS, gate::TensorMap, site::Int; trunc_p
     # @tensor θ_new[a, e, f, d] := gate[b, c, e, f] * θ[a, b, c, d]
     # SVD to split back into MPS form
     # U, S, V = tsvd(θ_new, ((1, 2), (3, 4)); trunc=truncerror(; rtol=get(trunc_params, :tol, 1e-10)))
-    U, S, V = tsvd(θ_new, ((1, 2), (3, 4)); trunc=combined_trunc)
+    U, S, V = tsvd(θ_new, ((1, 2), (3, 4)); trunc=trscheme)
     normalize!(S)
     # @show diag(S)
 
@@ -186,7 +190,7 @@ end
 Full TEBD time evolution
 """
 function tebd!(ψ::FiniteMPS, V::VectorSpace, dt::Number, num_steps::Int, gate_full, gate_half=nothing; 
-               imaginary_time=false, trotter_order=2, truncerr=1e-8, truncdim=10)
+               imaginary_time=false, trotter_order=2, trscheme=nothing)
     
     L = length(ψ)
     
@@ -222,15 +226,15 @@ function tebd!(ψ::FiniteMPS, V::VectorSpace, dt::Number, num_steps::Int, gate_f
     for step in 1:num_steps
         if trotter_order == 2
             # S2: U_odd(dt/2) U_even(dt) U_odd(dt/2)
-            ψ = tebd_sweep_split!(ψ, gates_odd_half, gates_even_full, gates_odd_half; truncerr=truncerr)
+            ψ = tebd_sweep_split!(ψ, gates_odd_half, gates_even_full, gates_odd_half; trscheme)
         else
             # S1: U_even(dt) U_odd(dt)
-            ψ = tebd_sweep!(ψ, gates_even_full, gates_odd_full; truncerr=truncerr, truncdim=truncdim)
+            ψ = tebd_sweep!(ψ, gates_even_full, gates_odd_full; trscheme)
         end
         
         # Optionally: normalize and compute energy/observables
         if step % 10 == 0
-            println("Step $step/$num_steps")
+            println("\t TEBD Step $step/$num_steps")
             # @show norm(ψ)
         end
     end
