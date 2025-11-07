@@ -1,8 +1,22 @@
+mutable struct METTSLogger
+    energies::Vector{Any}
+    Sz_all::Vector{Any}
+    Sx_all::Vector{Any}
+end
 
+function METTSLogger()
+    METTSLogger([], [], [])
+end
+
+function log_observables!(logger::METTSLogger, E0, Sz_sites, Sx_sites)
+    push!(logger.energies, real(E0))
+    push!(logger.Sz_all, Sz_sites)
+    push!(logger.Sx_all, Sx_sites)
+end
 
 
 function run_METTS(mps, H, projectors_1, projectors_2, beta, dt=0.1, N_samples=20, time_evol_alg=:tdvp, 
-    gate=nothing, gate_half=nothing, trotter_order=2; trscheme=nothing, verbose=1)
+    gate=nothing, gate_half=nothing, trotter_order=2; trscheme=nothing, verbose=1, logger=nothing)
 
     if time_evol_alg == :tebd || time_evol_alg == :tdvp2
         if isnothing(trscheme)
@@ -37,10 +51,12 @@ function run_METTS(mps, H, projectors_1, projectors_2, beta, dt=0.1, N_samples=2
     t_span = collect(0:dt:beta_half)
     n_steps_timeevol = length(t_span)
 
-    energies = []
-    Sz_all = []
-    Sx_all = []
-    
+    if isnothing(logger)
+        energies = []
+        Sz_all = []
+        Sx_all = []
+    end
+
     envs = environments(mps, H)
 
     for i in 1:N_samples
@@ -76,15 +92,22 @@ function run_METTS(mps, H, projectors_1, projectors_2, beta, dt=0.1, N_samples=2
         Sx_sites = [real(expectation_value(mps, i=>S_x())) for i in 1:L]
         Sz_tot = sum(Sz_sites)/L
     
-        push!(energies, real(E0))
-        push!(Sz_all, Sz_sites)
-        push!(Sx_all, Sx_sites)
+
+        if !isnothing(logger)
+            log_observables!(logger, E0, Sz_sites, Sx_sites)
+        else
+            push!(energies, real(E0))
+            push!(Sz_all, Sz_sites)
+            push!(Sx_all, Sx_sites)
+        end
     
         # Collapse onto a new product state
         collapse_to_cps!(mps, projectors)
     end
-    return energies, Sz_all, Sx_all
+    if !isnothing(logger)
+        return logger
+    else
+        return energies, Sz_all, Sx_all
+    end
 
 end
-
-
