@@ -159,6 +159,69 @@ function apply_two_site_gate!(ψ::FiniteMPS, gate::TensorMap, site::Int; kwargs.
     return ψ
 end
 
+
+"""
+Apply a two-site gate to an MPS at bond (site, site+1) and truncate based on QR scheme proposed in 10.1103/PhysRevB.107.155133
+"""
+function apply_two_site_gate_QR!(ψ::FiniteMPS, gate::TensorMap, site::Int; kwargs...)
+    # # Move orthogonality center to the bond
+    # ψ = MPSKit.center_position(ψ, site)
+
+    if haskey(kwargs, :trscheme)
+        trscheme = kwargs[:trscheme]
+    else
+        atol = get(kwargs, :truncerr, 1e-8)
+        maxdim = get(kwargs, :truncdim, 10)
+        trscheme = truncrank(maxdim) & trunctol(; atol)
+    end
+    
+    
+    # This algorithm uses the right-isometric form
+    
+    # Get the two-site tensor
+    @tensor θ[a, b, c, d] := ψ.AR[site][a, b, e] * ψ.AR[site+1][e, c, d]  # (abcd) = (vL, pL, pR, vR)
+    # Apply gate
+    @tensor θ_new[a, b, c, d] := gate[b, c, e, f] * θ[a, e, f, d]  # (abcd) = (vL, pL, pR, vR)
+   
+    # Apply left environment
+    @tensor θ_new[e, b, c, d] := L_env[e, a] * θ_new[a, b, c, d] # (ebcd) = (vL, pL, pR, vR)
+        
+    ### b1 diagram
+    # Contract theta object with the bra at site+1
+    ψ_bra = conj(ψ.AR[site+1]) # (vL, p*, vR)
+    @tensor M[a, b, e] := θ_new[a, b, c, d] * ψ_bra[e, c, d] # (abe) = (vL, pL, vR*), vR* here is the left leg of B*, so bond dimension between site and site+1
+    # Reshape before QR, merging first two indices
+    M_dims = size(M)
+    M = reshape(M, size(M, 1) * size(M, 2), size(M, 3))
+    # Apply QR to M
+    Q, R = LinearAlgebra.qr(M)
+    # Split back Q into three indices
+    Q = reshape(Q, M_dims[1], M_dims[2], size(Q, 2))
+    
+    ### b2 diagram
+    # Contract theta object with the bra at site
+    ψ_bra = conj(ψ.AR[site]) # (vL, p*, vR)
+    @tensor M[e, c, d] := θ_new[a, b, c, d] * ψ_bra[a, b, e] # (ecd) = (vL*, pR, vR), vL* here is the right leg of B*, so bond dimension between site and site+1
+    # Reshape before QR, merging first two indices
+    M2_dims = size(M)
+    M = reshape(M, size(M, 1) * size(M, 2), size(M, 3))
+    # Apply QR to M' to get the LQ
+    Q2, R2 = LinearAlgebra.qr(M')
+    # Get LQ by transposing
+    L = R2'
+    Q2 = Q2'
+    # equation M = L*Q2 should hold
+    # Reshape Q2 into three indices
+    Q2 = reshape(Q2, M2_dims[1], M2_dims[2], size(Q2, 2))
+    
+    ### b3 pending
+
+   
+    
+    return ψ
+end
+
+
 """
 Perform one TEBD sweep (even bonds, then odd bonds)
 """
