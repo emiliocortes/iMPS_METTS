@@ -114,3 +114,6 @@ plot!(energies, label="TEBD")
 plot!(energies_2, label="TDVP")
 plot!(energies_3, label="TDVP2")
 
+mps_t = deepcopy(mps)
+energies, Sz_all, Sx_all = run_METTS(mps_t, H, projectors_Z, projectors_Z, beta, dt, N_samples, :tebd, gate, gate_half, 2; trscheme=combined_trunc)
+plot!(energies, label="TEBD (only Z)")
